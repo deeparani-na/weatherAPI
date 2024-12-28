@@ -3,9 +3,11 @@ package com.deepa.weather.controller;
 import com.jayway.jsonpath.DocumentContext;
 import com.jayway.jsonpath.JsonPath;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.client.RestTemplate;
 
 import java.io.IOException;
 import java.net.URI;
@@ -33,24 +35,44 @@ public class SimpleController {
     @GetMapping("/weather")
     public String getWeather(Model model) throws IOException, InterruptedException, URISyntaxException {
 
-        HttpRequest getRequest = HttpRequest.newBuilder()
-                .uri(new URI("https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/eagan/today?unitGroup=us&include=current&key=GNZBTCFQ33PB7TXF5SDVHXMVC"))
-                .timeout(Duration.of(120, SECONDS))
-                .GET()
-                .build();
+        boolean useRestTemplate = true;
 
-        HttpResponse<String> response = HttpClient.newBuilder()
-                .build()
-                .send(getRequest, HttpResponse.BodyHandlers.ofString());
+        if (useRestTemplate) {
+            RestTemplate restTemplate = new RestTemplate();
+            String fooResourceUrl
+                    = "https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/eagan/today?unitGroup=us&include=current&key=GNZBTCFQ33PB7TXF5SDVHXMVC";
+            ResponseEntity<String> response
+                    = restTemplate.getForEntity(fooResourceUrl + "", String.class);
 
-        String responseJSON = response.body();
+            DocumentContext jsonContext = JsonPath.parse(response.getBody());
+            Double minTemp = jsonContext.read("$.days[0].tempmin");
+            Double maxTemp = jsonContext.read("$.days[0].tempmax");
 
-        DocumentContext jsonContext = JsonPath.parse(responseJSON);
-        Double minTemp = jsonContext.read("$.days[0].tempmin");
-        Double maxTemp = jsonContext.read("$.days[0].tempmax");
+            model.addAttribute("minTemp", minTemp);
+            model.addAttribute("maxTemp", maxTemp);
+            return "weather_restTemplate";
 
-        model.addAttribute("minTemp", minTemp);
-        model.addAttribute("maxTemp", maxTemp);
-        return "weather";
+        } else {
+
+            HttpRequest getRequest = HttpRequest.newBuilder()
+                    .uri(new URI("https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/eagan/today?unitGroup=us&include=current&key=GNZBTCFQ33PB7TXF5SDVHXMVC"))
+                    .timeout(Duration.of(120, SECONDS))
+                    .GET()
+                    .build();
+
+            HttpResponse<String> response = HttpClient.newBuilder()
+                    .build()
+                    .send(getRequest, HttpResponse.BodyHandlers.ofString());
+
+            String responseJSON = response.body();
+
+            DocumentContext jsonContext = JsonPath.parse(responseJSON);
+            Double minTemp = jsonContext.read("$.days[0].tempmin");
+            Double maxTemp = jsonContext.read("$.days[0].tempmax");
+
+            model.addAttribute("minTemp", minTemp);
+            model.addAttribute("maxTemp", maxTemp);
+            return "weather_httpClient";
+        }
     }
 }
